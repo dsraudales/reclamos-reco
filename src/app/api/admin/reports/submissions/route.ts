@@ -12,7 +12,7 @@ import {
   parseSubmissionFilters,
   toSubmissionQueryFilters,
 } from "@/lib/submission-filters";
-import { listSubmissions } from "@/lib/submissions";
+import { listSubmissionFiles, listSubmissions } from "@/lib/submissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,6 +84,25 @@ function applyBoxBorder(
   }
 }
 
+function styleHyperlinkCell(cell: ExcelJS.Cell) {
+  cell.font = {
+    color: { argb: "FF2563EB" },
+    underline: true,
+  };
+}
+
+function styleDataRow(row: ExcelJS.Row) {
+  row.eachCell((cell) => {
+    cell.border = {
+      bottom: { style: "thin", color: { argb: "FFF1F5F9" } },
+    };
+    cell.alignment = {
+      vertical: "top",
+      wrapText: true,
+    };
+  });
+}
+
 export async function GET(request: Request) {
   const user = await getAdminUserForRoute();
 
@@ -100,6 +119,10 @@ export async function GET(request: Request) {
   });
 
   const submissions = await listSubmissions(toSubmissionQueryFilters(filters));
+  const submissionFiles = await listSubmissionFiles(
+    submissions.map((submission) => submission.id),
+  );
+  const requestOrigin = url.origin;
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Codex";
@@ -115,6 +138,9 @@ export async function GET(request: Request) {
   const dataSheet = workbook.addWorksheet("Solicitudes", {
     views: [{ state: "frozen", ySplit: 1 }],
   });
+  const filesSheet = workbook.addWorksheet("Archivos", {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
 
   summarySheet.mergeCells("A1:E1");
   summarySheet.getCell("A1").value = "Reporte de solicitudes ingresadas";
@@ -128,15 +154,18 @@ export async function GET(request: Request) {
   summarySheet.getCell("B3").value = formatDateTime(new Date().toISOString());
   summarySheet.getCell("A4").value = "Generado por";
   summarySheet.getCell("B4").value = user.email ?? "Administrador";
-  summarySheet.getCell("A5").value = "Búsqueda";
+  summarySheet.getCell("A5").value = "Busqueda";
   summarySheet.getCell("B5").value = filters.search || "Todas";
   summarySheet.getCell("A6").value = "Estado";
   summarySheet.getCell("B6").value =
     filters.status === "all" ? "Todos" : STATUS_LABELS[filters.status];
   summarySheet.getCell("A7").value = "Fecha desde";
-  summarySheet.getCell("B7").value = filters.dateFrom || "Sin límite";
+  summarySheet.getCell("B7").value = filters.dateFrom || "Sin limite";
   summarySheet.getCell("A8").value = "Fecha hasta";
-  summarySheet.getCell("B8").value = filters.dateTo || "Sin límite";
+  summarySheet.getCell("B8").value = filters.dateTo || "Sin limite";
+  summarySheet.getCell("A9").value = "Enlaces";
+  summarySheet.getCell("B9").value =
+    "El libro incluye enlaces al panel y a la descarga autenticada de cada archivo.";
 
   summarySheet.getCell("D3").value = "Total filtradas";
   summarySheet.getCell("E3").value = submissions.length;
@@ -144,7 +173,7 @@ export async function GET(request: Request) {
   summarySheet.getCell("E4").value = submissions.filter(
     (submission) => submission.status === "new",
   ).length;
-  summarySheet.getCell("D5").value = "En revisión";
+  summarySheet.getCell("D5").value = "En revision";
   summarySheet.getCell("E5").value = submissions.filter(
     (submission) => submission.status === "in_review",
   ).length;
@@ -154,11 +183,15 @@ export async function GET(request: Request) {
   ).length;
 
   summarySheet.getColumn("A").width = 20;
-  summarySheet.getColumn("B").width = 34;
+  summarySheet.getColumn("B").width = 54;
   summarySheet.getColumn("D").width = 18;
   summarySheet.getColumn("E").width = 14;
+  summarySheet.getCell("B9").alignment = {
+    vertical: "top",
+    wrapText: true,
+  };
 
-  for (const rowNumber of [3, 4, 5, 6, 7, 8]) {
+  for (const rowNumber of [3, 4, 5, 6, 7, 8, 9]) {
     summarySheet.getCell(`A${rowNumber}`).font = { bold: true };
   }
 
@@ -166,7 +199,7 @@ export async function GET(request: Request) {
     summarySheet.getCell(`D${rowNumber}`).font = { bold: true };
   }
 
-  applyBoxBorder(summarySheet, 3, 8, 1, 2);
+  applyBoxBorder(summarySheet, 3, 9, 1, 2);
   applyBoxBorder(summarySheet, 3, 6, 4, 5);
 
   summarySheet.getRow(3).eachCell((cell, colNumber) => {
@@ -182,21 +215,48 @@ export async function GET(request: Request) {
     { header: "Fecha de ingreso", key: "createdAt", width: 22 },
     { header: "Estado", key: "status", width: 16 },
     { header: "Nombre completo", key: "fullName", width: 34 },
-    { header: "Código cliente", key: "clientCode", width: 18 },
-    { header: "Teléfono", key: "phone", width: 20 },
+    { header: "Codigo cliente", key: "clientCode", width: 18 },
+    { header: "Telefono", key: "phone", width: 20 },
     { header: "Correo", key: "email", width: 28 },
-    { header: "Imágenes", key: "filesCount", width: 12 },
-    { header: "Última actualización", key: "updatedAt", width: 22 },
+    { header: "Imagenes", key: "filesCount", width: 12 },
+    { header: "Ultima actualizacion", key: "updatedAt", width: 22 },
     { header: "Notas internas", key: "notes", width: 40 },
+    { header: "Detalle en panel", key: "detailLink", width: 24 },
   ];
 
   styleHeaderRow(dataSheet.getRow(1));
   dataSheet.autoFilter = {
     from: "A1",
-    to: "K1",
+    to: "L1",
   };
 
+  filesSheet.columns = [
+    { header: "Solicitud", key: "requestCode", width: 16 },
+    { header: "ID completo", key: "submissionId", width: 38 },
+    { header: "Nombre completo", key: "fullName", width: 30 },
+    { header: "Archivo", key: "fileName", width: 34 },
+    { header: "Tipo", key: "contentType", width: 20 },
+    { header: "Peso (bytes)", key: "sizeBytes", width: 16 },
+    { header: "Orden", key: "sortOrder", width: 12 },
+    { header: "Descarga", key: "downloadLink", width: 24 },
+    { header: "Detalle solicitud", key: "detailLink", width: 24 },
+  ];
+
+  styleHeaderRow(filesSheet.getRow(1));
+  filesSheet.autoFilter = {
+    from: "A1",
+    to: "I1",
+  };
+
+  const requestCodeBySubmissionId = new Map(
+    submissions.map((submission) => [submission.id, shortenId(submission.id)]),
+  );
+  const fullNameBySubmissionId = new Map(
+    submissions.map((submission) => [submission.id, submission.full_name]),
+  );
+
   submissions.forEach((submission) => {
+    const detailUrl = `${requestOrigin}/admin/submissions/${submission.id}`;
     const row = dataSheet.addRow({
       requestCode: shortenId(submission.id),
       id: submission.id,
@@ -204,11 +264,16 @@ export async function GET(request: Request) {
       status: STATUS_LABELS[submission.status],
       fullName: submission.full_name,
       clientCode: submission.client_code,
-      phone: submission.phone || "Sin teléfono",
+      phone: submission.phone || "Sin telefono",
       email: submission.email || "Sin correo",
       filesCount: submission.files_count,
       updatedAt: new Date(submission.updated_at),
       notes: submission.notes || "",
+      detailLink: {
+        text: "Abrir solicitud",
+        hyperlink: detailUrl,
+        tooltip: "Abrir detalle de la solicitud en el panel.",
+      },
     });
 
     row.getCell("createdAt").numFmt = "yyyy-mm-dd hh:mm";
@@ -221,21 +286,52 @@ export async function GET(request: Request) {
       statusFillMap[submission.status] ?? "FFE2E8F0",
     );
 
-    row.eachCell((cell) => {
-      cell.border = {
-        bottom: { style: "thin", color: { argb: "FFF1F5F9" } },
-      };
-      cell.alignment = {
-        vertical: "top",
-        wrapText: true,
-      };
+    styleDataRow(row);
+    styleHyperlinkCell(row.getCell("detailLink"));
+  });
+
+  submissionFiles.forEach((file) => {
+    const detailUrl = `${requestOrigin}/admin/submissions/${file.submission_id}`;
+    const downloadUrl = `${requestOrigin}/api/admin/files/${file.id}`;
+    const row = filesSheet.addRow({
+      requestCode: requestCodeBySubmissionId.get(file.submission_id) ?? "",
+      submissionId: file.submission_id,
+      fullName: fullNameBySubmissionId.get(file.submission_id) ?? "",
+      fileName: file.file_name,
+      contentType: file.content_type,
+      sizeBytes: file.size_bytes,
+      sortOrder: file.sort_order + 1,
+      downloadLink: {
+        text: "Descargar archivo",
+        hyperlink: downloadUrl,
+        tooltip: "Descarga autenticada del archivo.",
+      },
+      detailLink: {
+        text: "Abrir solicitud",
+        hyperlink: detailUrl,
+        tooltip: "Abrir detalle de la solicitud en el panel.",
+      },
     });
+
+    row.getCell("sizeBytes").numFmt = "#,##0";
+    row.getCell("sortOrder").alignment = { horizontal: "center" };
+
+    styleDataRow(row);
+    styleHyperlinkCell(row.getCell("downloadLink"));
+    styleHyperlinkCell(row.getCell("detailLink"));
   });
 
   if (!submissions.length) {
     dataSheet.addRow({
       requestCode: "Sin resultados",
       fullName: "No existen solicitudes para los filtros aplicados.",
+    });
+  }
+
+  if (!submissionFiles.length) {
+    filesSheet.addRow({
+      requestCode: "Sin archivos",
+      fileName: "No existen archivos para los filtros aplicados.",
     });
   }
 

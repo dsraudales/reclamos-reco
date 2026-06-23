@@ -122,6 +122,26 @@ export async function getSubmissionDetail(submissionId: string) {
   };
 }
 
+export async function listSubmissionFiles(submissionIds: string[]) {
+  if (!submissionIds.length) {
+    return [];
+  }
+
+  const supabase = createAdminSupabaseClient();
+  const { data, error } = await supabase
+    .from("submission_files")
+    .select("*")
+    .in("submission_id", submissionIds)
+    .order("submission_id", { ascending: true })
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as SubmissionFileRecord[];
+}
+
 export async function createSubmission(input: CreateSubmissionInput) {
   const supabase = createAdminSupabaseClient();
   const { bucket } = getStorageEnv();
