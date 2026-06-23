@@ -8,7 +8,7 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   ACCEPTED_IMAGE_TYPES,
@@ -48,27 +48,46 @@ function isAcceptedImage(file: File) {
   );
 }
 
+function getFileKey(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`;
+}
+
+function mergeSelectedFiles(existingFiles: File[], incomingFiles: File[]) {
+  const merged = new Map(existingFiles.map((file) => [getFileKey(file), file]));
+
+  for (const file of incomingFiles) {
+    merged.set(getFileKey(file), file);
+  }
+
+  return Array.from(merged.values());
+}
+
 export function PublicRequestForm() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
   const [status, setStatus] = useState<SubmissionStatusState>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
 
-  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
+  function clearSelectedFiles() {
+    setSelectedFiles([]);
+    setStatus(null);
 
-    if (files.length > MAX_FILES) {
-      setStatus({
-        type: "error",
-        message: `Solo puedes adjuntar hasta ${MAX_FILES} imágenes.`,
-      });
-      event.target.value = "";
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const incomingFiles = Array.from(event.target.files ?? []);
+
+    if (!incomingFiles.length) {
       return;
     }
 
-    const invalidType = files.find((file) => !isAcceptedImage(file));
+    const invalidType = incomingFiles.find((file) => !isAcceptedImage(file));
     if (invalidType) {
       setStatus({
         type: "error",
@@ -78,7 +97,9 @@ export function PublicRequestForm() {
       return;
     }
 
-    const oversizedFile = files.find((file) => file.size > MAX_FILE_SIZE_BYTES);
+    const oversizedFile = incomingFiles.find(
+      (file) => file.size > MAX_FILE_SIZE_BYTES,
+    );
     if (oversizedFile) {
       setStatus({
         type: "error",
@@ -88,8 +109,20 @@ export function PublicRequestForm() {
       return;
     }
 
-    setSelectedFiles(files);
+    const mergedFiles = mergeSelectedFiles(selectedFiles, incomingFiles);
+
+    if (mergedFiles.length > MAX_FILES) {
+      setStatus({
+        type: "error",
+        message: `Solo puedes adjuntar hasta ${MAX_FILES} imágenes.`,
+      });
+      event.target.value = "";
+      return;
+    }
+
+    setSelectedFiles(mergedFiles);
     setStatus(null);
+    event.target.value = "";
   }
 
   async function cleanupUploads(submissionId: string, paths: string[]) {
@@ -233,7 +266,7 @@ export function PublicRequestForm() {
       }
 
       form.reset();
-      setSelectedFiles([]);
+      clearSelectedFiles();
       setStatus({
         type: "success",
         message: `Solicitud enviada correctamente. Código de referencia: ${shortenId(finalizeData.requestId)}.`,
@@ -262,9 +295,6 @@ export function PublicRequestForm() {
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-brand">
           Formulario público
         </p>
-        <h2 className="mt-2 font-display text-3xl text-ink">
-          Recepción de fotografías
-        </h2>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
           Completa los datos del cliente y carga las imágenes de respaldo. Este
           envío permite adjuntar varias fotografías en una sola solicitud.
@@ -366,9 +396,10 @@ export function PublicRequestForm() {
               Seleccionar imágenes
             </span>
             <span className="mt-2 text-sm text-slate-500">
-              JPG, PNG, WEBP, HEIC o HEIF
+              Puedes seguir agregando archivos hasta completar el límite.
             </span>
             <input
+              ref={fileInputRef}
               name="images"
               type="file"
               multiple
@@ -393,16 +424,7 @@ export function PublicRequestForm() {
                 <button
                   type="button"
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-rose-200 hover:text-rose-600"
-                  onClick={() => {
-                    setSelectedFiles([]);
-                    setStatus(null);
-                    const input = document.querySelector<HTMLInputElement>(
-                      'input[name="images"]',
-                    );
-                    if (input) {
-                      input.value = "";
-                    }
-                  }}
+                  onClick={clearSelectedFiles}
                 >
                   <Trash2 className="h-4 w-4" />
                   Limpiar
@@ -412,7 +434,7 @@ export function PublicRequestForm() {
               <div className="mt-4 grid gap-3">
                 {selectedFiles.map((file) => (
                   <div
-                    key={`${file.name}-${file.size}`}
+                    key={getFileKey(file)}
                     className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm"
                   >
                     <div>

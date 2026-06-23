@@ -12,7 +12,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(19,59,108,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(200,154,61,0.18),transparent_30%)]" />
         <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 py-8 lg:py-10">
           <div className="space-y-6">
-            <div className="w-full max-w-[720px] rounded-[30px] border border-white/80 bg-white/92 p-4 shadow-[0_20px_50px_rgba(15,35,62,0.12)] sm:p-5">
+            <div className="w-full max-w-[520px] rounded-[28px] border border-white/80 bg-white/92 p-3 shadow-[0_20px_50px_rgba(15,35,62,0.12)] sm:p-4">
               <Image
                 src={creeLogo}
                 alt="Gobierno de Honduras y CREE"
@@ -55,8 +55,7 @@ export default function Home() {
               <li>
                 Adjunta fotografías claras y legibles de tu último recibo de
                 pago y de tu nota de crédito o débito, con un peso máximo de{" "}
-                {MAX_FILE_SIZE_MB} MB por imagen. Puedes actualizar este
-                límite.
+                {MAX_FILE_SIZE_MB} MB por imagen.
               </li>
               <li>
                 El número o código del cliente es obligatorio para que el equipo
