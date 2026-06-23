@@ -1,26 +1,56 @@
+@import "@fontsource/public-sans/latin.css";
+@import "@fontsource/lora/latin.css";
+@import "@fontsource/lora/latin-italic.css";
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f7fb;
+  --foreground: #10223a;
+  --brand: #133b6c;
+  --brand-strong: #0d294d;
+  --accent: #c89a3d;
+  --ink: #10223a;
+  --ink-strong: #091628;
+  --mist: #eef3f9;
+  --line: #d8e0eb;
+  --muted: #617086;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-accent: var(--accent);
+  --color-ink: var(--ink);
+  --color-ink-strong: var(--ink-strong);
+  --color-mist: var(--mist);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+  --font-sans: "Public Sans", sans-serif;
+  --font-display: "Lora", serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--background);
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(circle at top left, rgba(19, 59, 108, 0.08), transparent 32%),
+    linear-gradient(180deg, #f9fbfe 0%, #eef3fb 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Public Sans", sans-serif;
+}
+
+* {
+  border-color: var(--line);
+}
+
+::selection {
+  background: rgba(19, 59, 108, 0.18);
+}
+
+a {
+  text-decoration: none;
 }
