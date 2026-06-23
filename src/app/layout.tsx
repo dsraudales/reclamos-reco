@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Recepción de fotografías | CREE",
+  title: "Recepción de Reclamos | CREE",
   description:
-    "Formulario público y panel administrativo para recepción y gestión de solicitudes con imágenes.",
+    "Formulario público para la recepción de reclamos con evidencias e imágenes.",
 };
 
 export default function RootLayout({
