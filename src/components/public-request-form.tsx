@@ -144,12 +144,12 @@ export function PublicRequestForm() {
 
     let preparedUpload: PreparedUpload | null = null;
     const uploadedPaths: string[] = [];
-    const supabase = createBrowserSupabaseClient();
-
     setIsSubmitting(true);
     setStatus(null);
 
     try {
+      const supabase = await createBrowserSupabaseClient();
+
       setProgressMessage("Preparando la carga segura...");
 
       const prepareResponse = await fetch("/api/requests/uploads", {

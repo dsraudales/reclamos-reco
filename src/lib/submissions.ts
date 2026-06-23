@@ -1,6 +1,8 @@
 import "server-only";
 
 import { getStorageEnv } from "@/lib/env";
+import { getAdminDateKey } from "@/lib/formatters";
+import type { SubmissionQueryFilters } from "@/lib/submission-filters";
 import { deleteObjects } from "@/lib/storage";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type {
@@ -18,32 +20,93 @@ type CreateSubmissionInput = {
   files: FinalizedFileInput[];
 };
 
-export async function listSubmissions() {
+function normalizeSearchValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function matchesSearch(
+  submission: SubmissionRecord,
+  normalizedSearch: string | undefined,
+) {
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  const haystack = normalizeSearchValue(
+    [
+      submission.full_name,
+      submission.client_code,
+      submission.phone ?? "",
+      submission.email ?? "",
+      submission.notes ?? "",
+    ].join(" "),
+  );
+
+  return haystack.includes(normalizedSearch);
+}
+
+function matchesDateRange(
+  submission: SubmissionRecord,
+  filters: SubmissionQueryFilters,
+) {
+  const createdDate = getAdminDateKey(submission.created_at);
+
+  if (filters.dateFrom && createdDate < filters.dateFrom) {
+    return false;
+  }
+
+  if (filters.dateTo && createdDate > filters.dateTo) {
+    return false;
+  }
+
+  return true;
+}
+
+export async function listSubmissions(filters: SubmissionQueryFilters = {}) {
   const supabase = createAdminSupabaseClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("submissions")
     .select("*")
     .order("created_at", { ascending: false });
+
+  if (filters.status) {
+    query = query.eq("status", filters.status);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
   }
 
-  return (data ?? []) as SubmissionRecord[];
+  const normalizedSearch = filters.search
+    ? normalizeSearchValue(filters.search)
+    : undefined;
+
+  return ((data ?? []) as SubmissionRecord[]).filter(
+    (submission) =>
+      matchesSearch(submission, normalizedSearch) &&
+      matchesDateRange(submission, filters),
+  );
 }
 
 export async function getSubmissionDetail(submissionId: string) {
   const supabase = createAdminSupabaseClient();
 
-  const [{ data: submission, error: submissionError }, { data: files, error: filesError }] =
-    await Promise.all([
-      supabase.from("submissions").select("*").eq("id", submissionId).maybeSingle(),
-      supabase
-        .from("submission_files")
-        .select("*")
-        .eq("submission_id", submissionId)
-        .order("sort_order", { ascending: true }),
-    ]);
+  const [
+    { data: submission, error: submissionError },
+    { data: files, error: filesError },
+  ] = await Promise.all([
+    supabase.from("submissions").select("*").eq("id", submissionId).maybeSingle(),
+    supabase
+      .from("submission_files")
+      .select("*")
+      .eq("submission_id", submissionId)
+      .order("sort_order", { ascending: true }),
+  ]);
 
   if (submissionError) {
     throw submissionError;

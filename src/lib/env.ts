@@ -1,6 +1,4 @@
-function requireEnv(name: string) {
-  const value = process.env[name];
-
+function requireEnv(name: string, value: string | undefined) {
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
   }
@@ -13,22 +11,31 @@ function normalizePrefix(value: string) {
 }
 
 export function getSupabasePublicEnv() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
   return {
-    url: requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    anonKey: requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    // Next.js only inlines public env vars in browser bundles when they are
+    // referenced directly, not through process.env[name].
+    url: requireEnv("NEXT_PUBLIC_SUPABASE_URL", url),
+    anonKey: requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", anonKey),
   };
 }
 
 export function getSupabaseServiceEnv() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
   return {
     ...getSupabasePublicEnv(),
-    serviceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    serviceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY", serviceRoleKey),
   };
 }
 
 export function getStorageEnv() {
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET;
+
   return {
-    bucket: requireEnv("SUPABASE_STORAGE_BUCKET"),
+    bucket: requireEnv("SUPABASE_STORAGE_BUCKET", bucket),
     uploadPrefix: normalizePrefix(
       process.env.SUPABASE_STORAGE_UPLOAD_PREFIX ?? "solicitudes",
     ),

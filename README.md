@@ -7,6 +7,7 @@ Aplicación Next.js lista para desplegar en Vercel con:
 - Subida directa a Supabase Storage mediante URLs firmadas.
 - Registro y gestión de solicitudes en Supabase.
 - Panel administrativo autenticado con Supabase Auth.
+- Exportación a Excel desde el panel con filtros aplicados.
 
 ## Stack
 

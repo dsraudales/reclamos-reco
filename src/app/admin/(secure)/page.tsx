@@ -1,14 +1,38 @@
 import Link from "next/link";
-import { Clock3, FileText, FolderDown, SearchCheck } from "lucide-react";
+import {
+  Clock3,
+  Download,
+  FileText,
+  FolderDown,
+  SearchCheck,
+  SlidersHorizontal,
+} from "lucide-react";
 
 import { StatusBadge } from "@/components/admin/status-badge";
+import { STATUS_LABELS, SUBMISSION_STATUSES } from "@/lib/constants";
 import { formatDateTime, shortenId } from "@/lib/formatters";
+import {
+  buildSubmissionFilterQueryString,
+  countActiveSubmissionFilters,
+  parseSubmissionFilters,
+  toSubmissionQueryFilters,
+} from "@/lib/submission-filters";
 import { listSubmissions } from "@/lib/submissions";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminDashboardPage() {
-  const submissions = await listSubmissions();
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const filters = parseSubmissionFilters(await searchParams);
+  const submissions = await listSubmissions(toSubmissionQueryFilters(filters));
+  const activeFilterCount = countActiveSubmissionFilters(filters);
+  const exportQuery = buildSubmissionFilterQueryString(filters);
+  const exportHref = exportQuery
+    ? `/api/admin/reports/submissions?${exportQuery}`
+    : "/api/admin/reports/submissions";
 
   const stats = submissions.reduce(
     (accumulator, submission) => {
@@ -107,6 +131,120 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
 
+        <div className="border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+          <form className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_220px_180px_180px_auto_auto]">
+            <div className="space-y-2">
+              <label
+                htmlFor="search"
+                className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+              >
+                Buscar
+              </label>
+              <input
+                id="search"
+                name="search"
+                defaultValue={filters.search}
+                placeholder="Nombre, código, correo, teléfono o nota"
+                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/10"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="status"
+                className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+              >
+                Estado
+              </label>
+              <select
+                id="status"
+                name="status"
+                defaultValue={filters.status}
+                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/10"
+              >
+                <option value="all">Todos</option>
+                {SUBMISSION_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {STATUS_LABELS[status]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="dateFrom"
+                className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+              >
+                Fecha desde
+              </label>
+              <input
+                id="dateFrom"
+                name="dateFrom"
+                type="date"
+                defaultValue={filters.dateFrom}
+                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/10"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="dateTo"
+                className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+              >
+                Fecha hasta
+              </label>
+              <input
+                id="dateTo"
+                name="dateTo"
+                type="date"
+                defaultValue={filters.dateTo}
+                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/10"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="inline-flex h-11 items-center justify-center gap-2 self-end rounded-2xl bg-brand px-5 text-sm font-semibold text-white transition hover:bg-brand-strong"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Aplicar filtros
+            </button>
+
+            <Link
+              href="/admin"
+              className="inline-flex h-11 items-center justify-center self-end rounded-2xl border border-slate-200 px-5 text-sm font-semibold text-slate-700 transition hover:border-brand hover:text-brand"
+            >
+              Limpiar
+            </Link>
+          </form>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-600">
+              Mostrando <span className="font-semibold text-ink">{submissions.length}</span>{" "}
+              solicitud{submissions.length === 1 ? "" : "es"}
+              {activeFilterCount ? (
+                <>
+                  {" "}
+                  con <span className="font-semibold text-ink">{activeFilterCount}</span>{" "}
+                  filtro{activeFilterCount === 1 ? "" : "s"} activo
+                  {activeFilterCount === 1 ? "" : "s"}.
+                </>
+              ) : (
+                "."
+              )}
+            </p>
+
+            <Link
+              href={exportHref}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+            >
+              <Download className="h-4 w-4" />
+              Exportar Excel
+            </Link>
+          </div>
+        </div>
+
         {submissions.length ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-left">
@@ -166,10 +304,14 @@ export default async function AdminDashboardPage() {
         ) : (
           <div className="px-6 py-16 text-center">
             <p className="font-display text-2xl text-ink">
-              Aún no hay solicitudes registradas.
+              {activeFilterCount
+                ? "No hay solicitudes para los filtros aplicados."
+                : "Aún no hay solicitudes registradas."}
             </p>
             <p className="mt-3 text-sm text-slate-500">
-              Cuando el formulario público reciba envíos, aparecerán aquí.
+              {activeFilterCount
+                ? "Prueba con otro estado, rango de fechas o término de búsqueda."
+                : "Cuando el formulario público reciba envíos, aparecerán aquí."}
             </p>
           </div>
         )}
